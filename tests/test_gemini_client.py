@@ -7,31 +7,29 @@ class _FakeResponse:
         self.text = text
 
 
-class _FakeModel:
-    last_init = None
-    last_history = None
+class _FakeChats:
+    last_create = None
     last_message = None
 
-    def __init__(self, model_name, system_instruction):
-        _FakeModel.last_init = {"model": model_name, "system": system_instruction}
-
-    def start_chat(self, history):
-        _FakeModel.last_history = history
+    def create(self, model, config, history):
+        _FakeChats.last_create = {"model": model, "config": config, "history": history}
         return self
 
     def send_message(self, message):
-        _FakeModel.last_message = message
+        _FakeChats.last_message = message
         return _FakeResponse("ответ от gemini")
 
 
+class _FakeClient:
+    last_api_key = None
+
+    def __init__(self, api_key):
+        _FakeClient.last_api_key = api_key
+        self.chats = _FakeChats()
+
+
 class _FakeGenai:
-    configured_with = None
-
-    @staticmethod
-    def configure(api_key):
-        _FakeGenai.configured_with = api_key
-
-    GenerativeModel = _FakeModel
+    Client = _FakeClient
 
 
 def test_generate_returns_text(monkeypatch):
@@ -42,10 +40,13 @@ def test_generate_returns_text(monkeypatch):
         user_message="как дела?",
     )
     assert result == "ответ от gemini"
-    assert _FakeGenai.configured_with == "key"
-    assert _FakeModel.last_init == {"model": "gemini-2.5-pro", "system": "SP"}
-    assert _FakeModel.last_history == [
-        {"role": "user", "parts": ["привет"]},
-        {"role": "model", "parts": ["здравствуйте"]},
+    assert _FakeClient.last_api_key == "key"
+    assert _FakeChats.last_create["model"] == "gemini-2.5-pro"
+    # system_prompt передаётся в config как system_instruction
+    assert _FakeChats.last_create["config"].system_instruction == "SP"
+    # история конвертируется в формат google-genai {"role", "parts": [{"text"}]}
+    assert _FakeChats.last_create["history"] == [
+        {"role": "user", "parts": [{"text": "привет"}]},
+        {"role": "model", "parts": [{"text": "здравствуйте"}]},
     ]
-    assert _FakeModel.last_message == "как дела?"
+    assert _FakeChats.last_message == "как дела?"
