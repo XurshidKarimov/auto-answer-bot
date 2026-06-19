@@ -66,6 +66,11 @@ chmod 600 /opt/auto-answer-bot/.env
 GitHub → профиль/репозиторий → Packages → `auto-answer-bot` → Package settings →
 Change visibility → Public. Иначе сервер не скачает образ.
 
+> Примечание: при самом первом push пакет ещё приватный, поэтому джоб `deploy`
+> может упасть на `docker compose pull`. Это ожидаемо — сделай пакет публичным
+> (шаг 3) и перезапусти workflow (`Re-run jobs` или вкладка Actions →
+> `Run workflow`). Последующие деплои пройдут автоматически.
+
 ### Проверка
 
 ```bash
