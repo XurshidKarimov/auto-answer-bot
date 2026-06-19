@@ -3,6 +3,7 @@
 import logging
 
 from dotenv import load_dotenv
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -43,7 +44,9 @@ def main():
     )
 
     logging.getLogger(__name__).info("Бот запущен (polling)")
-    app.run_polling()
+    # ALL_TYPES включает business_message — иначе бот не получит сообщения
+    # из Telegram Business-чатов, которыми управляет за пользователя.
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
