@@ -1,0 +1,6 @@
+services:
+  bot:
+    image: ghcr.io/xurshidkarimov/auto-answer-bot:latest
+    container_name: auto-answer-bot
+    env_file: .env
+    restart: unless-stopped
