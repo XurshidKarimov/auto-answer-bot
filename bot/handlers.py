@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 ERROR_REPLY = "Извините, не удалось обработать запрос, попробуйте ещё раз."
 START_REPLY = "Привет! Я ассистент на Gemini. Напишите сообщение — отвечу."
+# Подпись внизу каждого AI-ответа: показывает, что отвечает автоответчик
+ASSISTANT_SIGNATURE = "🤖 Telegram Assistant (автоответчик)"
 
 
 async def start(update, context):
@@ -42,7 +44,8 @@ def build_message_handler(store: ConversationStore, gemini):
             await update.message.reply_text(ERROR_REPLY)
             return
 
-        await update.message.reply_text(reply)
+        await update.message.reply_text(f"{reply}\n\n{ASSISTANT_SIGNATURE}")
+        # в историю сохраняем чистый ответ без подписи, чтобы не засорять контекст
         store.append(chat_id, "user", text)
         store.append(chat_id, "model", reply)
 

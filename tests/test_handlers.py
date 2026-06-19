@@ -1,7 +1,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from bot.handlers import build_message_handler, ERROR_REPLY
+from bot.handlers import build_message_handler, ERROR_REPLY, ASSISTANT_SIGNATURE
 from bot.memory import ConversationStore
 from bot.special_replies import FRIDAY_REPLY
 
@@ -38,7 +38,9 @@ def test_normal_message_calls_gemini_and_saves_history():
     asyncio.run(handler(update, MagicMock()))
 
     gemini.generate.assert_called_once_with(history=[], user_message="привет")
-    update.message.reply_text.assert_awaited_once_with("ответ")
+    # пользователю уходит ответ с подписью автоответчика
+    update.message.reply_text.assert_awaited_once_with(f"ответ\n\n{ASSISTANT_SIGNATURE}")
+    # в историю сохраняется чистый ответ без подписи
     assert store.get(2) == [
         {"role": "user", "text": "привет"},
         {"role": "model", "text": "ответ"},
@@ -56,7 +58,7 @@ def test_caption_message_processed_as_text():
     asyncio.run(handler(update, MagicMock()))
 
     gemini.generate.assert_called_once_with(history=[], user_message="что на видео?")
-    update.message.reply_text.assert_awaited_once_with("ответ")
+    update.message.reply_text.assert_awaited_once_with(f"ответ\n\n{ASSISTANT_SIGNATURE}")
     assert store.get(4) == [
         {"role": "user", "text": "что на видео?"},
         {"role": "model", "text": "ответ"},

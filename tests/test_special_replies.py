@@ -26,4 +26,8 @@ def test_non_greetings_return_none(text):
 
 
 def test_reply_text_is_exact():
-    assert FRIDAY_REPLY == "Assalomu alaykum. Rahmat, birgalikda bo'lsin☪️"
+    assert FRIDAY_REPLY == (
+        "Амийн, ё Раббал аламийн! Ушбу муборак кунда Аллоҳ гуноҳларимизни мағфират "
+        "қилиб, икки дунё саодатини насиб этсин. Сизга ва оила аъзоларингизга ҳам "
+        "хайрли бўлсин🤲"
+    )
