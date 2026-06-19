@@ -1,0 +1,57 @@
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
+
+from bot.handlers import build_message_handler, ERROR_REPLY
+from bot.memory import ConversationStore
+from bot.special_replies import FRIDAY_REPLY
+
+
+def _make_update(chat_id, text):
+    update = MagicMock()
+    update.effective_chat.id = chat_id
+    update.message.text = text
+    update.message.reply_text = AsyncMock()
+    return update
+
+
+def test_friday_greeting_replies_fixed_and_skips_history():
+    store = ConversationStore(max_history=10)
+    gemini = MagicMock()
+    handler = build_message_handler(store, gemini)
+    update = _make_update(1, "Juma muborak")
+
+    asyncio.run(handler(update, MagicMock()))
+
+    update.message.reply_text.assert_awaited_once_with(FRIDAY_REPLY)
+    gemini.generate.assert_not_called()
+    assert store.get(1) == []
+
+
+def test_normal_message_calls_gemini_and_saves_history():
+    store = ConversationStore(max_history=10)
+    gemini = MagicMock()
+    gemini.generate.return_value = "ответ"
+    handler = build_message_handler(store, gemini)
+    update = _make_update(2, "привет")
+
+    asyncio.run(handler(update, MagicMock()))
+
+    gemini.generate.assert_called_once_with(history=[], user_message="привет")
+    update.message.reply_text.assert_awaited_once_with("ответ")
+    assert store.get(2) == [
+        {"role": "user", "text": "привет"},
+        {"role": "model", "text": "ответ"},
+    ]
+
+
+def test_gemini_error_replies_friendly_and_keeps_history_clean():
+    store = ConversationStore(max_history=10)
+    gemini = MagicMock()
+    gemini.generate.side_effect = RuntimeError("boom")
+    handler = build_message_handler(store, gemini)
+    update = _make_update(3, "привет")
+
+    asyncio.run(handler(update, MagicMock()))
+
+    update.message.reply_text.assert_awaited_once_with(ERROR_REPLY)
+    assert store.get(3) == []
