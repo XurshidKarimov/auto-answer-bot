@@ -25,7 +25,10 @@ def reset_factory(store: ConversationStore):
 def build_message_handler(store: ConversationStore, gemini):
     async def on_message(update, context):
         chat_id = update.effective_chat.id
-        text = update.message.text
+        # У пересланного видео/фото текст лежит в caption, а не в text
+        text = update.message.text or update.message.caption
+        if not text:
+            return
 
         special = match(text)
         if special is not None:

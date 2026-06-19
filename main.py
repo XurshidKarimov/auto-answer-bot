@@ -36,7 +36,10 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset_factory(store)))
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, build_message_handler(store, gemini))
+        MessageHandler(
+            (filters.TEXT | filters.CAPTION) & ~filters.COMMAND,
+            build_message_handler(store, gemini),
+        )
     )
 
     logging.getLogger(__name__).info("Бот запущен (polling)")
