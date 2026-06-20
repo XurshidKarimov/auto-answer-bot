@@ -1,6 +1,7 @@
 """Обработчики команд и сообщений Telegram."""
 
 import logging
+import string
 
 from bot.memory import ConversationStore
 from bot.special_replies import FRIDAY_REPLY
@@ -29,7 +30,7 @@ def reset_factory(store: ConversationStore):
 
 def _normalize_token(raw: str) -> str:
     """Привести сырой ответ Gemini к виду для сверки с токенами протокола."""
-    return raw.strip().strip(".!…").upper()
+    return raw.strip().strip(string.punctuation + "…").strip().upper()
 
 
 def build_message_handler(store: ConversationStore, gemini):
