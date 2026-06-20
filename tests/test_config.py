@@ -39,3 +39,13 @@ def test_missing_token_raises():
 def test_missing_api_key_raises():
     with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
         load_config({"TELEGRAM_BOT_TOKEN": "tok"})
+
+
+def test_default_system_prompt_is_classifier():
+    from bot.config import load_config
+    cfg = load_config({
+        "TELEGRAM_BOT_TOKEN": "t",
+        "GEMINI_API_KEY": "k",
+    })
+    assert "FRIDAY" in cfg.system_prompt
+    assert "IGNORE" in cfg.system_prompt
