@@ -1,7 +1,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from bot.handlers import build_message_handler, ERROR_REPLY, ASSISTANT_SIGNATURE
+from bot.handlers import build_message_handler, ASSISTANT_SIGNATURE
 from bot.memory import ConversationStore
 from bot.special_replies import FRIDAY_REPLY
 
@@ -15,58 +15,78 @@ def _make_update(chat_id, text, caption=None):
     return update
 
 
-def test_friday_greeting_replies_fixed_and_skips_history():
+def test_ignore_token_stays_silent():
     store = ConversationStore(max_history=10)
     gemini = MagicMock()
+    gemini.generate.return_value = "IGNORE"
     handler = build_message_handler(store, gemini)
-    update = _make_update(1, "Juma muborak")
+    update = _make_update(1, "Расскажи про Python")
+
+    asyncio.run(handler(update, MagicMock()))
+
+    update.effective_message.reply_text.assert_not_called()
+    assert store.get(1) == []
+
+
+def test_ignore_token_is_robust_to_case_and_punctuation():
+    store = ConversationStore(max_history=10)
+    gemini = MagicMock()
+    gemini.generate.return_value = "  Ignore.  "
+    handler = build_message_handler(store, gemini)
+    update = _make_update(8, "сколько времени?")
+
+    asyncio.run(handler(update, MagicMock()))
+
+    update.effective_message.reply_text.assert_not_called()
+    assert store.get(8) == []
+
+
+def test_friday_token_sends_fixed_reply_without_signature_or_history():
+    store = ConversationStore(max_history=10)
+    gemini = MagicMock()
+    gemini.generate.return_value = "FRIDAY"
+    handler = build_message_handler(store, gemini)
+    update = _make_update(2, "Juma muborak")
 
     asyncio.run(handler(update, MagicMock()))
 
     update.effective_message.reply_text.assert_awaited_once_with(FRIDAY_REPLY)
-    gemini.generate.assert_not_called()
-    assert store.get(1) == []
+    assert store.get(2) == []
 
 
-def test_normal_message_calls_gemini_and_saves_history():
+def test_congratulation_text_sent_with_signature_and_saved():
     store = ConversationStore(max_history=10)
     gemini = MagicMock()
-    gemini.generate.return_value = "ответ"
+    gemini.generate.return_value = "Спасибо, и вас с праздником!"
     handler = build_message_handler(store, gemini)
-    update = _make_update(2, "привет")
+    update = _make_update(3, "С Новым годом!")
 
     asyncio.run(handler(update, MagicMock()))
 
-    gemini.generate.assert_called_once_with(history=[], user_message="привет")
-    # пользователю уходит ответ с подписью автоответчика
-    update.effective_message.reply_text.assert_awaited_once_with(f"ответ\n\n{ASSISTANT_SIGNATURE}")
-    # в историю сохраняется чистый ответ без подписи
-    assert store.get(2) == [
-        {"role": "user", "text": "привет"},
-        {"role": "model", "text": "ответ"},
+    gemini.generate.assert_called_once_with(history=[], user_message="С Новым годом!")
+    update.effective_message.reply_text.assert_awaited_once_with(
+        f"Спасибо, и вас с праздником!\n\n{ASSISTANT_SIGNATURE}"
+    )
+    assert store.get(3) == [
+        {"role": "user", "text": "С Новым годом!"},
+        {"role": "model", "text": "Спасибо, и вас с праздником!"},
     ]
 
 
 def test_caption_message_processed_as_text():
-    # Пересланное видео с подписью: text=None, текст лежит в caption
     store = ConversationStore(max_history=10)
     gemini = MagicMock()
-    gemini.generate.return_value = "ответ"
+    gemini.generate.return_value = "IGNORE"
     handler = build_message_handler(store, gemini)
     update = _make_update(4, text=None, caption="что на видео?")
 
     asyncio.run(handler(update, MagicMock()))
 
     gemini.generate.assert_called_once_with(history=[], user_message="что на видео?")
-    update.effective_message.reply_text.assert_awaited_once_with(f"ответ\n\n{ASSISTANT_SIGNATURE}")
-    assert store.get(4) == [
-        {"role": "user", "text": "что на видео?"},
-        {"role": "model", "text": "ответ"},
-    ]
+    update.effective_message.reply_text.assert_not_called()
 
 
 def test_message_without_text_or_caption_is_ignored():
-    # Видео без подписи: ни текста, ни caption — бот молчит
     store = ConversationStore(max_history=10)
     gemini = MagicMock()
     handler = build_message_handler(store, gemini)
@@ -80,35 +100,32 @@ def test_message_without_text_or_caption_is_ignored():
 
 
 def test_business_message_handled_via_effective_message():
-    # В Telegram Business-чате update.message is None (текст в business_message);
-    # обработчик должен работать через effective_message и не падать.
     store = ConversationStore(max_history=10)
     gemini = MagicMock()
-    gemini.generate.return_value = "ответ"
+    gemini.generate.return_value = "Поздравляю взаимно!"
     handler = build_message_handler(store, gemini)
-    update = _make_update(7, "привет")
+    update = _make_update(7, "С днём рождения!")
     update.message = None  # как в бизнес-апдейте
 
     asyncio.run(handler(update, MagicMock()))
 
-    gemini.generate.assert_called_once_with(history=[], user_message="привет")
     update.effective_message.reply_text.assert_awaited_once_with(
-        f"ответ\n\n{ASSISTANT_SIGNATURE}"
+        f"Поздравляю взаимно!\n\n{ASSISTANT_SIGNATURE}"
     )
     assert store.get(7) == [
-        {"role": "user", "text": "привет"},
-        {"role": "model", "text": "ответ"},
+        {"role": "user", "text": "С днём рождения!"},
+        {"role": "model", "text": "Поздравляю взаимно!"},
     ]
 
 
-def test_gemini_error_replies_friendly_and_keeps_history_clean():
+def test_gemini_error_stays_silent():
     store = ConversationStore(max_history=10)
     gemini = MagicMock()
     gemini.generate.side_effect = RuntimeError("boom")
     handler = build_message_handler(store, gemini)
-    update = _make_update(3, "привет")
+    update = _make_update(6, "привет")
 
     asyncio.run(handler(update, MagicMock()))
 
-    update.effective_message.reply_text.assert_awaited_once_with(ERROR_REPLY)
-    assert store.get(3) == []
+    update.effective_message.reply_text.assert_not_called()
+    assert store.get(6) == []

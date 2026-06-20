@@ -3,14 +3,17 @@
 import logging
 
 from bot.memory import ConversationStore
-from bot.special_replies import match
+from bot.special_replies import FRIDAY_REPLY
 
 logger = logging.getLogger(__name__)
 
-ERROR_REPLY = "Извините, не удалось обработать запрос, попробуйте ещё раз."
-START_REPLY = "Привет! Я ассистент на Gemini. Напишите сообщение — отвечу."
-# Подпись внизу каждого AI-ответа: показывает, что отвечает автоответчик
+START_REPLY = "Привет! Я автоответчик. Отвечаю только на поздравления."
+# Подпись внизу AI-ответа: показывает, что отвечает автоответчик
 ASSISTANT_SIGNATURE = "🤖 Telegram Assistant (автоответчик)"
+
+# Токены протокола, которые возвращает Gemini
+_IGNORE = "IGNORE"
+_FRIDAY = "FRIDAY"
 
 
 async def start(update, context):
@@ -24,6 +27,11 @@ def reset_factory(store: ConversationStore):
     return reset
 
 
+def _normalize_token(raw: str) -> str:
+    """Привести сырой ответ Gemini к виду для сверки с токенами протокола."""
+    return raw.strip().strip(".!…").upper()
+
+
 def build_message_handler(store: ConversationStore, gemini):
     async def on_message(update, context):
         # effective_message покрывает и обычные, и Business-чаты (business_message),
@@ -35,16 +43,18 @@ def build_message_handler(store: ConversationStore, gemini):
         if not text:
             return
 
-        special = match(text)
-        if special is not None:
-            await message.reply_text(special)
-            return
-
         try:
             reply = gemini.generate(history=store.get(chat_id), user_message=text)
         except Exception:
+            # Бот-автоответчик молчит при сбое: не шлём ошибку в чат
             logger.exception("Ошибка при вызове Gemini")
-            await message.reply_text(ERROR_REPLY)
+            return
+
+        token = _normalize_token(reply)
+        if token == _IGNORE:
+            return
+        if token == _FRIDAY:
+            await message.reply_text(FRIDAY_REPLY)
             return
 
         await message.reply_text(f"{reply}\n\n{ASSISTANT_SIGNATURE}")
