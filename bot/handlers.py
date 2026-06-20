@@ -51,6 +51,9 @@ def build_message_handler(store: ConversationStore, gemini):
             logger.exception("Ошибка при вызове Gemini")
             return
 
+        if not reply or not reply.strip():
+            return
+
         token = _normalize_token(reply)
         if token == _IGNORE:
             return

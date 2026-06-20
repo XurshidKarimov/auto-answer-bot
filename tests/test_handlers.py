@@ -155,3 +155,29 @@ def test_friday_token_with_exclamation():
 
     update.effective_message.reply_text.assert_awaited_once_with(FRIDAY_REPLY)
     assert store.get(10) == []
+
+
+def test_empty_gemini_output_stays_silent():
+    store = ConversationStore(max_history=10)
+    gemini = MagicMock()
+    gemini.generate.return_value = ""
+    handler = build_message_handler(store, gemini)
+    update = _make_update(11, "Привет")
+
+    asyncio.run(handler(update, MagicMock()))
+
+    update.effective_message.reply_text.assert_not_called()
+    assert store.get(11) == []
+
+
+def test_none_gemini_output_stays_silent():
+    store = ConversationStore(max_history=10)
+    gemini = MagicMock()
+    gemini.generate.return_value = None
+    handler = build_message_handler(store, gemini)
+    update = _make_update(12, "Привет")
+
+    asyncio.run(handler(update, MagicMock()))
+
+    update.effective_message.reply_text.assert_not_called()
+    assert store.get(12) == []
